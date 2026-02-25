@@ -2,9 +2,11 @@ package com.quvntvn.motiondots.overlay
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.view.View
 import androidx.core.graphics.withSave
+import com.quvntvn.motiondots.data.DotColor
 import kotlin.math.abs
 
 class HorizonOverlayView(context: Context) : View(context) {
@@ -12,6 +14,7 @@ class HorizonOverlayView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 4f
+        color = Color.WHITE
     }
 
     private var opacity: Float = 0.16f
@@ -19,9 +22,10 @@ class HorizonOverlayView(context: Context) : View(context) {
     private var shiftY: Float = 0f
     private var tiltDeg: Float = 0f
 
-    fun configure(opacity: Float, intensity: Float) {
+    fun configure(opacity: Float, intensity: Float, dotColor: DotColor) {
         setOpacity(opacity)
         setIntensity(intensity)
+        setDotColor(dotColor)
     }
 
     fun setOpacity(opacity: Float) {
@@ -33,6 +37,13 @@ class HorizonOverlayView(context: Context) : View(context) {
 
     fun setIntensity(intensity: Float) {
         this.intensity = intensity.coerceIn(0f, 10f)
+    }
+
+    fun setDotColor(color: DotColor) {
+        val target = if (color == DotColor.BLACK) Color.BLACK else Color.WHITE
+        if (paint.color == target) return
+        paint.color = target
+        invalidate()
     }
 
     fun setMotion(verticalShiftPx: Float, tiltDegrees: Float) {
