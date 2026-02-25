@@ -51,6 +51,12 @@ class OverlayService : Service(), SensorEventListener {
     private var filteredY = 0f
     private var lastSensorDispatchMs = 0L
 
+    private data class MotionTuning(
+        val intensityMultiplier: Float,
+        val maxOffset: Float,
+        val lowPassAlpha: Float,
+    )
+
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
@@ -196,7 +202,9 @@ class OverlayService : Service(), SensorEventListener {
         val values = event?.values ?: return
         if (values.size < 2) return
 
-        val alpha = 0.18f
+        val motionTuning = mapMotionTuningPreset(currentSettings.intensityPreset)
+
+        val alpha = motionTuning.lowPassAlpha
         filteredX += alpha * (values[0] - filteredX)
         filteredY += alpha * (values[1] - filteredY)
 
@@ -206,8 +214,10 @@ class OverlayService : Service(), SensorEventListener {
 
         if (abs(filteredX) < 0.03f && abs(filteredY) < 0.03f) return
 
-        val dx = -filteredX * 38f
-        val dy = filteredY * 38f
+        val dx = (-filteredX * motionTuning.intensityMultiplier * 10f)
+            .coerceIn(-motionTuning.maxOffset, motionTuning.maxOffset)
+        val dy = (filteredY * motionTuning.intensityMultiplier * 10f)
+            .coerceIn(-motionTuning.maxOffset, motionTuning.maxOffset)
 
         serviceScope.launch {
             when (val view = overlayView) {
@@ -250,6 +260,26 @@ class OverlayService : Service(), SensorEventListener {
         IntensityPreset.LOW -> 3f
         IntensityPreset.NORMAL -> 6f
         IntensityPreset.HIGH -> 9f
+    }
+
+    private fun mapMotionTuningPreset(preset: IntensityPreset): MotionTuning = when (preset) {
+        IntensityPreset.LOW -> MotionTuning(
+            intensityMultiplier = 1.5f,
+            maxOffset = 25f,
+            lowPassAlpha = 0.08f,
+        )
+
+        IntensityPreset.NORMAL -> MotionTuning(
+            intensityMultiplier = 3f,
+            maxOffset = 45f,
+            lowPassAlpha = 0.15f,
+        )
+
+        IntensityPreset.HIGH -> MotionTuning(
+            intensityMultiplier = 6f,
+            maxOffset = 80f,
+            lowPassAlpha = 0.25f,
+        )
     }
 
     private fun mapOpacityPreset(preset: OpacityPreset): Float = when (preset) {
