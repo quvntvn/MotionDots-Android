@@ -1,5 +1,6 @@
 package com.quvntvn.motiondots
 
+import android.app.ActivityManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -8,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,12 +24,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -46,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -75,6 +86,7 @@ class MainActivity : ComponentActivity() {
 private object AppRoute {
     const val Onboarding = "onboarding"
     const val Main = "main"
+    const val Preview = "preview"
 }
 
 @Composable
@@ -117,7 +129,16 @@ private fun MotionDotsApp() {
             )
         }
         composable(AppRoute.Main) {
-            MainScreen(settingsDataStore = settingsDataStore)
+            MainScreen(
+                settingsDataStore = settingsDataStore,
+                onOpenPreview = { navController.navigate(AppRoute.Preview) },
+            )
+        }
+        composable(AppRoute.Preview) {
+            PreviewScreen(
+                settingsDataStore = settingsDataStore,
+                onBack = { navController.popBackStack() },
+            )
         }
     }
 }
@@ -305,125 +326,279 @@ private fun ModeSelectionStep(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MainScreen(settingsDataStore: SettingsDataStore) {
+private fun MainScreen(
+    settingsDataStore: SettingsDataStore,
+    onOpenPreview: () -> Unit,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val settings by settingsDataStore.settingsFlow.collectAsState(initial = OverlaySettings())
     var canDraw by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    var isOverlayRunning by remember { mutableStateOf(isOverlayServiceRunning(context)) }
 
-    LaunchedEffect(Unit) { canDraw = Settings.canDrawOverlays(context) }
+    LaunchedEffect(Unit) {
+        canDraw = Settings.canDrawOverlays(context)
+        isOverlayRunning = isOverlayServiceRunning(context)
+    }
 
     LaunchedEffect(settings.autoStartOverlay, canDraw) {
         if (settings.autoStartOverlay && canDraw) {
             context.startService(Intent(context, OverlayService::class.java))
+            isOverlayRunning = true
         }
     }
 
     DisposableEffect(Unit) {
-        onDispose { canDraw = Settings.canDrawOverlays(context) }
+        onDispose {
+            canDraw = Settings.canDrawOverlays(context)
+            isOverlayRunning = isOverlayServiceRunning(context)
+        }
     }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(innerPadding)
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                text = "MotionDots",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "Startup-ready stabilization cues for motion comfort.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("Overlay permission: ${if (canDraw) "Granted" else "Required"}")
+                    Text("Overlay running: ${if (isOverlayRunning) "Running" else "Stopped"}")
+                    if (!canDraw) {
+                        Button(onClick = {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}"),
+                                ),
+                            )
+                        }) {
+                            Text("Grant overlay permission")
+                        }
+                    }
+                }
+            }
+
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canDraw || isOverlayRunning,
+                onClick = {
+                    if (isOverlayRunning) {
+                        context.stopService(Intent(context, OverlayService::class.java))
+                        isOverlayRunning = false
+                    } else if (canDraw) {
+                        context.startService(Intent(context, OverlayService::class.java))
+                        isOverlayRunning = true
+                    }
+                },
+            ) {
+                Text(if (isOverlayRunning) "Stop service" else "Start service")
+            }
+
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onOpenPreview,
+            ) {
+                Text("Preview")
+            }
+
+            Text(text = "Mode", style = MaterialTheme.typography.titleMedium)
+            val modeOptions = listOf(OverlayMode.CLASSIC_DOTS, OverlayMode.EDGE_DOTS, OverlayMode.HORIZON)
+            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                modeOptions.forEachIndexed { index, mode ->
+                    val isPro = mode == OverlayMode.EDGE_DOTS || mode == OverlayMode.HORIZON
+                    val enabled = !isPro || settings.isPremium
+                    val label = when (mode) {
+                        OverlayMode.CLASSIC_DOTS -> "Classic"
+                        OverlayMode.EDGE_DOTS -> "Edge"
+                        OverlayMode.HORIZON -> "Horizon"
+                        OverlayMode.DISABLED -> "Disabled"
+                    }
+                    SegmentedButton(
+                        selected = settings.selectedMode == mode,
+                        enabled = true,
+                        onClick = {
+                            if (enabled) {
+                                scope.launch { settingsDataStore.setSelectedMode(mode) }
+                            } else {
+                                scope.launch { snackbarHostState.showSnackbar("Upgrade to unlock") }
+                            }
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = modeOptions.size),
+                        label = {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(label)
+                                if (isPro && !settings.isPremium) {
+                                    Badge { Text("PRO") }
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+
+            SettingSlider(
+                title = "Intensity",
+                valueLabel = settings.intensity.toInt().toString(),
+                value = settings.intensity,
+                onValueChange = { value -> scope.launch { settingsDataStore.setIntensity(value) } },
+                valueRange = 0f..10f,
+                steps = 9,
+            )
+
+            SettingSlider(
+                title = "Opacity",
+                valueLabel = "${(settings.opacity * 100).toInt()}%",
+                value = settings.opacity,
+                onValueChange = { value -> scope.launch { settingsDataStore.setOpacity(value) } },
+                valueRange = 0f..1f,
+                steps = 19,
+            )
+
+            if (settings.selectedMode != OverlayMode.HORIZON) {
+                SettingSlider(
+                    title = "Density",
+                    valueLabel = settings.dotCount.toString(),
+                    value = settings.dotCount.toFloat(),
+                    onValueChange = { value -> scope.launch { settingsDataStore.setDotCount(value.toInt()) } },
+                    valueRange = 10f..100f,
+                    steps = 89,
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text(text = "Auto-start overlay")
+                Switch(
+                    checked = settings.autoStartOverlay,
+                    onCheckedChange = { checked -> scope.launch { settingsDataStore.setAutoStartOverlay(checked) } },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviewScreen(
+    settingsDataStore: SettingsDataStore,
+    onBack: () -> Unit,
+) {
+    val settings by settingsDataStore.settingsFlow.collectAsState(initial = OverlaySettings())
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
             .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(text = "MOTIONDOTS", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            text = "This visual cue system helps your brain anticipate vehicle motion.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        Text(text = "Overlay permission: ${if (canDraw) "Granted" else "Required"}")
+        Text("Preview", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text("Live in-app preview (no overlay permission required).")
 
-        Button(onClick = {
-            context.startActivity(
-                Intent(
-                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:${context.packageName}"),
-                ),
-            )
-        }) {
-            Text("Open overlay settings")
-        }
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                when (settings.selectedMode) {
+                    OverlayMode.CLASSIC_DOTS, OverlayMode.EDGE_DOTS -> DotPreviewCanvas(
+                        dotCount = settings.dotCount,
+                        opacity = settings.opacity,
+                        edgeOnly = settings.selectedMode == OverlayMode.EDGE_DOTS,
+                    )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = canDraw, onClick = {
-                context.startService(Intent(context, OverlayService::class.java))
-            }) {
-                Text("Start overlay")
-            }
-
-            Button(onClick = {
-                context.stopService(Intent(context, OverlayService::class.java))
-            }) {
-                Text("Stop overlay")
+                    OverlayMode.HORIZON -> HorizonPreviewCanvas(opacity = settings.opacity)
+                    OverlayMode.DISABLED -> Unit
+                }
             }
         }
 
-        Text(text = "Visual mode", style = MaterialTheme.typography.titleMedium)
-        OverlayMode.entries.forEach { mode ->
-            val enabledForTier = when (mode) {
-                OverlayMode.CLASSIC_DOTS, OverlayMode.DISABLED -> true
-                OverlayMode.EDGE_DOTS, OverlayMode.HORIZON -> settings.isPremium
-            }
-
-            Row(modifier = Modifier.fillMaxWidth()) {
-                RadioButton(
-                    selected = settings.selectedMode == mode,
-                    enabled = enabledForTier,
-                    onClick = {
-                        scope.launch {
-                            settingsDataStore.setSelectedMode(mode)
-                        }
-                    },
-                )
-                Text(
-                    text = mode.name.replace('_', ' '),
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
-        }
-
-        SettingSlider(
-            title = "Intensity",
-            valueLabel = settings.intensity.toInt().toString(),
-            value = settings.intensity,
-            onValueChange = { value -> scope.launch { settingsDataStore.setIntensity(value) } },
-            valueRange = 0f..10f,
-            steps = 9,
-            enabled = settings.isPremium || settings.selectedMode == OverlayMode.CLASSIC_DOTS,
-        )
-
-        SettingSlider(
-            title = "Opacity",
-            valueLabel = "${(settings.opacity * 100).toInt()}%",
-            value = settings.opacity,
-            onValueChange = { value -> scope.launch { settingsDataStore.setOpacity(value) } },
-            valueRange = 0f..1f,
-            steps = 19,
-            enabled = settings.isPremium,
-        )
-
-        SettingSlider(
-            title = "Dot count",
-            valueLabel = settings.dotCount.toString(),
-            value = settings.dotCount.toFloat(),
-            onValueChange = { value -> scope.launch { settingsDataStore.setDotCount(value.toInt()) } },
-            valueRange = 10f..100f,
-            steps = 89,
-            enabled = settings.isPremium,
-        )
-
-        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            Text(text = "Auto-start overlay")
-            Switch(
-                checked = settings.autoStartOverlay,
-                onCheckedChange = { checked -> scope.launch { settingsDataStore.setAutoStartOverlay(checked) } },
-            )
+        Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+            Text("Back")
         }
     }
+}
+
+@Composable
+private fun DotPreviewCanvas(
+    dotCount: Int,
+    opacity: Float,
+    edgeOnly: Boolean,
+) {
+    val dotColor = MaterialTheme.colorScheme.primary.copy(alpha = opacity.coerceIn(0.1f, 1f))
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val columns = 10
+        val rows = (dotCount / columns).coerceAtLeast(1)
+        val horizontalGap = size.width / (columns + 1)
+        val verticalGap = size.height / (rows + 1)
+
+        var drawn = 0
+        for (row in 1..rows) {
+            for (col in 1..columns) {
+                if (drawn >= dotCount) break
+                val isEdge = col == 1 || col == columns
+                if (!edgeOnly || isEdge) {
+                    drawCircle(
+                        color = dotColor,
+                        radius = 6.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(col * horizontalGap, row * verticalGap),
+                    )
+                }
+                drawn += 1
+            }
+        }
+    }
+}
+
+@Composable
+private fun HorizonPreviewCanvas(opacity: Float) {
+    val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = opacity.coerceIn(0.1f, 1f))
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        drawLine(
+            color = lineColor,
+            start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f),
+            end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f),
+            strokeWidth = 6.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+    }
+}
+
+private fun isOverlayServiceRunning(context: android.content.Context): Boolean {
+    val activityManager = context.getSystemService(ActivityManager::class.java)
+    @Suppress("DEPRECATION")
+    return activityManager?.getRunningServices(Int.MAX_VALUE)
+        ?.any { it.service.className == OverlayService::class.java.name } == true
 }
