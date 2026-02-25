@@ -445,7 +445,7 @@ private fun MainScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Image(
-                    painter = painterResource(id = R.mipmap.ic_launcher),
+                    painter = painterResource(id = R.drawable.ic_launcher_foreground),
                     contentDescription = stringResource(R.string.app_logo),
                     modifier = Modifier
                         .size(48.dp)
