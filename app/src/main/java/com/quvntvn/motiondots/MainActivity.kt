@@ -1,4 +1,4 @@
-package com.example.motiondots
+package com.quvntvn.motiondots
 
 import android.content.Intent
 import android.net.Uri
@@ -31,10 +31,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.motiondots.data.OverlayMode
-import com.example.motiondots.data.SettingsDataStore
-import com.example.motiondots.overlay.OverlayService
-import com.example.motiondots.ui.components.SettingSlider
+import com.quvntvn.motiondots.data.OverlayMode
+import com.quvntvn.motiondots.data.SettingsDataStore
+import com.quvntvn.motiondots.overlay.OverlayService
+import com.quvntvn.motiondots.ui.components.SettingSlider
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -55,7 +55,7 @@ private fun MotionDotsScreen() {
     val settingsDataStore = remember { SettingsDataStore(context) }
     val scope = rememberCoroutineScope()
 
-    val settings by settingsDataStore.settingsFlow.collectAsState(initial = com.example.motiondots.data.OverlaySettings())
+    val settings by settingsDataStore.settingsFlow.collectAsState(initial = com.quvntvn.motiondots.data.OverlaySettings())
     var canDraw by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     LaunchedEffect(Unit) { canDraw = Settings.canDrawOverlays(context) }

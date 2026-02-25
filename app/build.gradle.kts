@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.motiondots"
+    namespace = "com.quvntvn.motiondots"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.motiondots"
+        applicationId = "com.quvntvn.motiondots"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

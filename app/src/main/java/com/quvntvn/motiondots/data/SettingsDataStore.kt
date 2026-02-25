@@ -1,4 +1,4 @@
-package com.example.motiondots.data
+package com.quvntvn.motiondots.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.Preferences
