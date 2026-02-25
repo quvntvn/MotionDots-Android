@@ -15,6 +15,7 @@ import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import com.quvntvn.motiondots.BuildConfig
 import com.quvntvn.motiondots.data.DensityPreset
 import com.quvntvn.motiondots.data.IntensityPreset
 import com.quvntvn.motiondots.data.OpacityPreset
@@ -84,10 +85,12 @@ class OverlayService : Service(), SensorEventListener {
     private fun applySettings(settings: OverlaySettings) {
         val previous = currentSettings
         currentSettings = settings
+        val resolvedMode = resolveOverlayMode(settings)
+        val previousResolvedMode = resolveOverlayMode(previous)
 
-        val modeChanged = previous.selectedMode != settings.selectedMode || overlayView == null
+        val modeChanged = previousResolvedMode != resolvedMode || overlayView == null
         if (modeChanged) {
-            swapOverlayForMode(settings.selectedMode)
+            swapOverlayForMode(resolvedMode)
         }
 
         val mappedIntensity = mapIntensityPreset(settings.intensityPreset)
@@ -95,7 +98,7 @@ class OverlayService : Service(), SensorEventListener {
 
         when (val view = overlayView) {
             is DotsOverlayView -> {
-                val targetMode = if (settings.selectedMode == OverlayMode.EDGE_DOTS) {
+                val targetMode = if (resolvedMode == OverlayMode.EDGE_DOTS) {
                     DotsOverlayView.DotMode.EDGE
                 } else {
                     DotsOverlayView.DotMode.CLASSIC
@@ -115,7 +118,7 @@ class OverlayService : Service(), SensorEventListener {
             }
         }
 
-        if (settings.selectedMode == OverlayMode.DISABLED) {
+        if (resolvedMode == OverlayMode.DISABLED) {
             unregisterSensor()
         } else {
             registerSensorIfNeeded()
@@ -236,6 +239,12 @@ class OverlayService : Service(), SensorEventListener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun resolveOverlayMode(settings: OverlaySettings): OverlayMode {
+        val isPremium = BuildConfig.FORCE_PREMIUM || settings.isPremium
+        return settings.selectedMode.takeIf { it != OverlayMode.EDGE_DOTS && it != OverlayMode.HORIZON || isPremium }
+            ?: OverlayMode.CLASSIC_DOTS
+    }
 
     private fun mapIntensityPreset(preset: IntensityPreset): Float = when (preset) {
         IntensityPreset.LOW -> 3f

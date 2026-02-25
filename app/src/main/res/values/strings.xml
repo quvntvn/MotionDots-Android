@@ -34,6 +34,10 @@
     <string name="overlay_stopped">Overlay stopped</string>
     <string name="overlay_started">Overlay started</string>
     <string name="preview">Preview</string>
+    <string name="premium_feature">Premium feature</string>
+    <string name="premium_enabled">Premium enabled</string>
+    <string name="premium_disabled">Premium disabled</string>
+    <string name="app_logo">App logo</string>
     <string name="upgrade_to_unlock">Upgrade to unlock</string>
     <string name="pro_badge">PRO</string>
 
