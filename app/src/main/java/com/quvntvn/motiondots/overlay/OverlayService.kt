@@ -1,4 +1,4 @@
-package com.example.motiondots.overlay
+package com.quvntvn.motiondots.overlay
 
 import android.app.Service
 import android.content.BroadcastReceiver
@@ -14,9 +14,9 @@ import android.os.IBinder
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import com.example.motiondots.data.OverlayMode
-import com.example.motiondots.data.OverlaySettings
-import com.example.motiondots.data.SettingsDataStore
+import com.quvntvn.motiondots.data.OverlayMode
+import com.quvntvn.motiondots.data.OverlaySettings
+import com.quvntvn.motiondots.data.SettingsDataStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

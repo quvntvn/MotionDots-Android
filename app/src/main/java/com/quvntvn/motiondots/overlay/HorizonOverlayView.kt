@@ -1,4 +1,4 @@
-package com.example.motiondots.overlay
+package com.quvntvn.motiondots.overlay
 
 import android.content.Context
 import android.graphics.Canvas

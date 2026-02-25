@@ -1,4 +1,4 @@
-package com.example.motiondots.ui.components
+package com.quvntvn.motiondots.ui.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
