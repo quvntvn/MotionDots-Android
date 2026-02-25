@@ -1,3 +1,52 @@
 <resources>
     <string name="app_name">MotionDots</string>
+    <string name="loading">Loading…</string>
+
+    <string name="onboarding_welcome">Welcome to MotionDots</string>
+    <string name="onboarding_step">Step %1$d of %2$d</string>
+    <string name="back">Back</string>
+    <string name="continue_label">Continue</string>
+    <string name="start_overlay">Start Overlay</string>
+    <string name="intro_description">MotionDots adds subtle visual cues to help your body anticipate movement and reduce motion discomfort.</string>
+    <string name="illustration_placeholder">Illustration Placeholder</string>
+    <string name="permission_description">Overlay permission lets MotionDots draw indicators on top of your current apps while you travel.</string>
+    <string name="allow_overlay_permission">Allow Overlay Permission</string>
+    <string name="select_cue_style">Select your preferred cue style</string>
+
+    <string name="mode_dots">Dots</string>
+    <string name="mode_edge">Edge</string>
+    <string name="mode_horizon">Horizon</string>
+    <string name="mode_disabled">Disabled</string>
+    <string name="mode_classic">Classic</string>
+    <string name="mode_label">Mode</string>
+
+    <string name="main_tagline">Startup-ready stabilization cues for motion comfort.</string>
+    <string name="status_title">Status</string>
+    <string name="overlay_permission_status">Overlay permission: %1$s</string>
+    <string name="overlay_running_status">Overlay running: %1$s</string>
+    <string name="status_granted">Granted</string>
+    <string name="status_required">Required</string>
+    <string name="status_running">Running</string>
+    <string name="status_stopped">Stopped</string>
+    <string name="grant_overlay_permission">Grant overlay permission</string>
+    <string name="stop_service">Stop service</string>
+    <string name="start_service">Start service</string>
+    <string name="overlay_stopped">Overlay stopped</string>
+    <string name="overlay_started">Overlay started</string>
+    <string name="preview">Preview</string>
+    <string name="upgrade_to_unlock">Upgrade to unlock</string>
+    <string name="pro_badge">PRO</string>
+
+    <string name="intensity">Intensity</string>
+    <string name="opacity">Opacity</string>
+    <string name="density">Density</string>
+    <string name="auto_start_overlay">Auto-start overlay</string>
+    <string name="privacy_note">Offline. No data collection.</string>
+    <string name="changes_apply_instantly">Changes apply instantly.</string>
+    <string name="slider_value_format">%1$s: %2$s</string>
+    <string name="percent_value">%1$d%%</string>
+
+    <string name="preview_title">Preview</string>
+    <string name="preview_subtitle">Live in-app preview (no overlay permission required).</string>
+    <string name="back_to_home">Back to Home</string>
 </resources>

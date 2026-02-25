@@ -11,6 +11,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.IBinder
+import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
@@ -43,6 +44,7 @@ class OverlayService : Service(), SensorEventListener {
 
     private var filteredX = 0f
     private var filteredY = 0f
+    private var lastSensorDispatchMs = 0L
 
     private val screenStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -70,37 +72,61 @@ class OverlayService : Service(), SensorEventListener {
         settingsJob?.cancel()
         settingsJob = serviceScope.launch {
             settingsDataStore.settingsFlow.collectLatest { settings ->
-                currentSettings = settings
-                switchOverlay(settings)
+                applySettings(settings)
             }
         }
     }
 
-    private fun switchOverlay(settings: OverlaySettings) {
+    private fun applySettings(settings: OverlaySettings) {
+        val previous = currentSettings
+        currentSettings = settings
+
+        val modeChanged = previous.selectedMode != settings.selectedMode || overlayView == null
+        if (modeChanged) {
+            swapOverlayForMode(settings.selectedMode)
+        }
+
+        when (val view = overlayView) {
+            is DotsOverlayView -> {
+                val targetMode = if (settings.selectedMode == OverlayMode.EDGE_DOTS) {
+                    DotsOverlayView.DotMode.EDGE
+                } else {
+                    DotsOverlayView.DotMode.CLASSIC
+                }
+                view.setMode(targetMode)
+                view.setOpacity(settings.opacity)
+                if (previous.dotCount != settings.dotCount || modeChanged) {
+                    view.setDotCount(settings.dotCount)
+                }
+                view.setIntensity(settings.intensity)
+            }
+
+            is HorizonOverlayView -> {
+                view.setOpacity(settings.opacity)
+                view.setIntensity(settings.intensity)
+            }
+        }
+
+        if (settings.selectedMode == OverlayMode.DISABLED) {
+            unregisterSensor()
+        } else {
+            registerSensorIfNeeded()
+        }
+    }
+
+    private fun swapOverlayForMode(mode: OverlayMode) {
         removeOverlayViewSafely()
 
-        val view = when (settings.selectedMode) {
-            OverlayMode.CLASSIC_DOTS -> DotsOverlayView(this).apply {
-                configure(settings.dotCount, settings.opacity, DotsOverlayView.DotMode.CLASSIC)
-            }
-
-            OverlayMode.EDGE_DOTS -> DotsOverlayView(this).apply {
-                configure(settings.dotCount, settings.opacity, DotsOverlayView.DotMode.EDGE)
-            }
-
-            OverlayMode.HORIZON -> HorizonOverlayView(this).apply {
-                configure(settings.opacity)
-            }
-
+        val view = when (mode) {
+            OverlayMode.CLASSIC_DOTS -> DotsOverlayView(this)
+            OverlayMode.EDGE_DOTS -> DotsOverlayView(this)
+            OverlayMode.HORIZON -> HorizonOverlayView(this)
             OverlayMode.DISABLED -> null
         }
 
         overlayView = view
         if (view != null) {
             addOverlayView(view)
-            registerSensorIfNeeded()
-        } else {
-            unregisterSensor()
         }
     }
 
@@ -163,20 +189,26 @@ class OverlayService : Service(), SensorEventListener {
         filteredX += alpha * (values[0] - filteredX)
         filteredY += alpha * (values[1] - filteredY)
 
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastSensorDispatchMs < 16L) return
+        lastSensorDispatchMs = now
+
         if (abs(filteredX) < 0.03f && abs(filteredY) < 0.03f) return
 
-        val intensityScale = (currentSettings.intensity / 10f).coerceIn(0f, 1f)
-        val pxScale = 38f * intensityScale
+        val dx = -filteredX * 38f
+        val dy = filteredY * 38f
 
-        when (val view = overlayView) {
-            is DotsOverlayView -> {
-                view.setMotion(dx = -filteredX * pxScale, dy = filteredY * pxScale)
-            }
+        serviceScope.launch {
+            when (val view = overlayView) {
+                is DotsOverlayView -> {
+                    view.setMotion(dx = dx, dy = dy)
+                }
 
-            is HorizonOverlayView -> {
-                val verticalShift = filteredY * pxScale * 1.3f
-                val tilt = filteredX * 1.8f * intensityScale * 10f
-                view.setMotion(verticalShiftPx = verticalShift, tiltDegrees = tilt)
+                is HorizonOverlayView -> {
+                    val verticalShift = dy * 1.3f
+                    val tilt = -dx * 1.8f
+                    view.setMotion(verticalShiftPx = verticalShift, tiltDegrees = tilt)
+                }
             }
         }
     }

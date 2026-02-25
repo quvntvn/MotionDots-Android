@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -118,6 +119,7 @@ private fun MotionDotsApp() {
     if (hasOnboarded == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
+            Text(text = stringResource(id = R.string.loading))
         }
         return
     }
@@ -202,12 +204,12 @@ private fun OnboardingScreen(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Text(
-            text = "Welcome to MotionDots",
+            text = stringResource(R.string.onboarding_welcome),
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            text = "Step ${stepIndex + 1} of ${steps.size}",
+            text = stringResource(R.string.onboarding_step, stepIndex + 1, steps.size),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -239,7 +241,7 @@ private fun OnboardingScreen(
                     modifier = Modifier.weight(1f),
                     onClick = { stepIndex -= 1 },
                 ) {
-                    Text("Back")
+                    Text(stringResource(R.string.back))
                 }
             }
 
@@ -253,7 +255,13 @@ private fun OnboardingScreen(
                     }
                 },
             ) {
-                Text(if (currentStep == OnboardingStep.MODE) "Start Overlay" else "Continue")
+                Text(
+                    if (currentStep == OnboardingStep.MODE) {
+                        stringResource(R.string.start_overlay)
+                    } else {
+                        stringResource(R.string.continue_label)
+                    },
+                )
             }
         }
     }
@@ -263,7 +271,7 @@ private fun OnboardingScreen(
 private fun IntroStep() {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "MotionDots adds subtle visual cues to help your body anticipate movement and reduce motion discomfort.",
+            text = stringResource(R.string.intro_description),
             style = MaterialTheme.typography.bodyLarge,
         )
         Box(
@@ -275,7 +283,7 @@ private fun IntroStep() {
             contentAlignment = Alignment.Center,
         ) {
             Text(
-                text = "Illustration Placeholder",
+                text = stringResource(R.string.illustration_placeholder),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -287,11 +295,11 @@ private fun IntroStep() {
 private fun PermissionStep(onOpenPermission: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "Overlay permission lets MotionDots draw indicators on top of your current apps while you travel.",
+            text = stringResource(R.string.permission_description),
             style = MaterialTheme.typography.bodyLarge,
         )
         Button(onClick = onOpenPermission) {
-            Text("Allow Overlay Permission")
+            Text(stringResource(R.string.allow_overlay_permission))
         }
     }
 }
@@ -305,15 +313,15 @@ private fun ModeSelectionStep(
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(
-            text = "Select your preferred cue style",
+            text = stringResource(R.string.select_cue_style),
             style = MaterialTheme.typography.bodyLarge,
         )
         modes.forEach { mode ->
             val label = when (mode) {
-                OverlayMode.CLASSIC_DOTS -> "Dots"
-                OverlayMode.EDGE_DOTS -> "Edge"
-                OverlayMode.HORIZON -> "Horizon"
-                OverlayMode.DISABLED -> "Disabled"
+                OverlayMode.CLASSIC_DOTS -> stringResource(R.string.mode_dots)
+                OverlayMode.EDGE_DOTS -> stringResource(R.string.mode_edge)
+                OverlayMode.HORIZON -> stringResource(R.string.mode_horizon)
+                OverlayMode.DISABLED -> stringResource(R.string.mode_disabled)
             }
             Card(
                 modifier = Modifier
@@ -388,12 +396,12 @@ private fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Text(
-                text = "MotionDots",
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Startup-ready stabilization cues for motion comfort.",
+                text = stringResource(R.string.main_tagline),
                 style = MaterialTheme.typography.bodyMedium,
             )
 
@@ -407,9 +415,9 @@ private fun MainScreen(
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    Text("Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text("Overlay permission: ${if (canDraw) "Granted" else "Required"}")
-                    Text("Overlay running: ${if (isOverlayRunning) "Running" else "Stopped"}")
+                    Text(stringResource(R.string.status_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.overlay_permission_status, if (canDraw) stringResource(R.string.status_granted) else stringResource(R.string.status_required)))
+                    Text(stringResource(R.string.overlay_running_status, if (isOverlayRunning) stringResource(R.string.status_running) else stringResource(R.string.status_stopped)))
                     if (!canDraw) {
                         Button(onClick = {
                             context.startActivity(
@@ -419,7 +427,7 @@ private fun MainScreen(
                                 ),
                             )
                         }) {
-                            Text("Grant overlay permission")
+                            Text(stringResource(R.string.grant_overlay_permission))
                         }
                     }
                 }
@@ -433,36 +441,36 @@ private fun MainScreen(
                         context.stopService(Intent(context, OverlayService::class.java))
                         isOverlayRunning = false
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        scope.launch { snackbarHostState.showSnackbar("Overlay stopped") }
+                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.overlay_stopped)) }
                     } else if (canDraw) {
                         context.startService(Intent(context, OverlayService::class.java))
                         isOverlayRunning = true
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        scope.launch { snackbarHostState.showSnackbar("Overlay started") }
+                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.overlay_started)) }
                     }
                 },
             ) {
-                Text(if (isOverlayRunning) "Stop service" else "Start service")
+                Text(if (isOverlayRunning) stringResource(R.string.stop_service) else stringResource(R.string.start_service))
             }
 
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onOpenPreview,
             ) {
-                Text("Preview")
+                Text(stringResource(R.string.preview))
             }
 
-            Text(text = "Mode", style = MaterialTheme.typography.titleMedium)
+            Text(text = stringResource(R.string.mode_label), style = MaterialTheme.typography.titleMedium)
             val modeOptions = listOf(OverlayMode.CLASSIC_DOTS, OverlayMode.EDGE_DOTS, OverlayMode.HORIZON)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 modeOptions.forEachIndexed { index, mode ->
                     val isPro = mode == OverlayMode.EDGE_DOTS || mode == OverlayMode.HORIZON
                     val enabled = !isPro || settings.isPremium
                     val label = when (mode) {
-                        OverlayMode.CLASSIC_DOTS -> "Classic"
-                        OverlayMode.EDGE_DOTS -> "Edge"
-                        OverlayMode.HORIZON -> "Horizon"
-                        OverlayMode.DISABLED -> "Disabled"
+                        OverlayMode.CLASSIC_DOTS -> stringResource(R.string.mode_classic)
+                        OverlayMode.EDGE_DOTS -> stringResource(R.string.mode_edge)
+                        OverlayMode.HORIZON -> stringResource(R.string.mode_horizon)
+                        OverlayMode.DISABLED -> stringResource(R.string.mode_disabled)
                     }
                     SegmentedButton(
                         selected = settings.selectedMode == mode,
@@ -474,7 +482,7 @@ private fun MainScreen(
                                     scope.launch { settingsDataStore.setSelectedMode(mode) }
                                 }
                             } else {
-                                scope.launch { snackbarHostState.showSnackbar("Upgrade to unlock") }
+                                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.upgrade_to_unlock)) }
                             }
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = modeOptions.size),
@@ -485,7 +493,7 @@ private fun MainScreen(
                             ) {
                                 Text(label)
                                 if (isPro && !settings.isPremium) {
-                                    Badge { Text("PRO") }
+                                    Badge { Text(stringResource(R.string.pro_badge)) }
                                 }
                             }
                         },
@@ -494,36 +502,42 @@ private fun MainScreen(
             }
 
             SettingSlider(
-                title = "Intensity",
+                title = stringResource(R.string.intensity),
                 valueLabel = settings.intensity.toInt().toString(),
                 value = settings.intensity,
-                onValueChange = { value -> scope.launch { settingsDataStore.setIntensity(value) } },
+                onValueChangeFinished = { value -> scope.launch { settingsDataStore.setIntensity(value) } },
                 valueRange = 0f..10f,
                 steps = 9,
             )
 
             SettingSlider(
-                title = "Opacity",
-                valueLabel = "${(settings.opacity * 100).toInt()}%",
+                title = stringResource(R.string.opacity),
+                valueLabel = stringResource(R.string.percent_value, (settings.opacity * 100).toInt()),
                 value = settings.opacity,
-                onValueChange = { value -> scope.launch { settingsDataStore.setOpacity(value) } },
+                onValueChangeFinished = { value -> scope.launch { settingsDataStore.setOpacity(value) } },
                 valueRange = 0f..1f,
                 steps = 19,
             )
 
             if (settings.selectedMode != OverlayMode.HORIZON) {
                 SettingSlider(
-                    title = "Density",
+                    title = stringResource(R.string.density),
                     valueLabel = settings.dotCount.toString(),
                     value = settings.dotCount.toFloat(),
-                    onValueChange = { value -> scope.launch { settingsDataStore.setDotCount(value.toInt()) } },
+                    onValueChangeFinished = { value -> scope.launch { settingsDataStore.setDotCount(value.toInt()) } },
                     valueRange = 10f..100f,
                     steps = 89,
                 )
             }
 
+            Text(
+                text = stringResource(R.string.changes_apply_instantly),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
             Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(text = "Auto-start overlay")
+                Text(text = stringResource(R.string.auto_start_overlay))
                 Switch(
                     checked = settings.autoStartOverlay,
                     onCheckedChange = { checked -> scope.launch { settingsDataStore.setAutoStartOverlay(checked) } },
@@ -531,7 +545,7 @@ private fun MainScreen(
             }
 
             Text(
-                text = "Offline. No data collection.",
+                text = stringResource(R.string.privacy_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -553,8 +567,8 @@ private fun PreviewScreen(
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Preview", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Text("Live in-app preview (no overlay permission required).")
+        Text(stringResource(R.string.preview_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.preview_subtitle))
 
         Card(
             modifier = Modifier
@@ -583,7 +597,7 @@ private fun PreviewScreen(
         }
 
         TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-            Text("Back to Home")
+            Text(stringResource(R.string.back_to_home))
         }
     }
 }
