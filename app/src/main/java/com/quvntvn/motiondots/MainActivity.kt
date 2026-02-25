@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -70,6 +72,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -109,6 +112,8 @@ private object AppRoute {
     const val Preview = "preview"
 }
 
+private fun OverlayMode.isPremiumMode(): Boolean = this == OverlayMode.EDGE_DOTS || this == OverlayMode.HORIZON
+
 @Composable
 private fun MotionDotsApp() {
     val context = LocalContext.current
@@ -119,6 +124,8 @@ private fun MotionDotsApp() {
     val hasOnboarded by produceState<Boolean?>(initialValue = null, settingsDataStore) {
         settingsDataStore.hasOnboardedFlow.collect { value = it }
     }
+    val settings by settingsDataStore.settingsFlow.collectAsState(initial = OverlaySettings())
+    val isPremium = BuildConfig.FORCE_PREMIUM || settings.isPremium
 
     if (hasOnboarded == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -134,6 +141,7 @@ private fun MotionDotsApp() {
     ) {
         composable(AppRoute.Onboarding) {
             OnboardingScreen(
+                isPremium = isPremium,
                 onComplete = { mode, startOverlay ->
                     scope.launch {
                         settingsDataStore.setSelectedMode(mode)
@@ -172,9 +180,12 @@ private enum class OnboardingStep {
 
 @Composable
 private fun OnboardingScreen(
+    isPremium: Boolean,
     onComplete: (OverlayMode, Boolean) -> Unit,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var canDraw by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var selectedMode by rememberSaveable { mutableStateOf(OverlayMode.CLASSIC_DOTS) }
     var stepIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -201,71 +212,80 @@ private fun OnboardingScreen(
 
     val currentStep = steps[stepIndex]
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.onboarding_welcome),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.SemiBold,
-        )
-        Text(
-            text = stringResource(R.string.onboarding_step, stepIndex + 1, steps.size),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-
-        when (currentStep) {
-            OnboardingStep.INTRO -> IntroStep()
-            OnboardingStep.PERMISSION -> PermissionStep(
-                onOpenPermission = {
-                    permissionLauncher.launch(
-                        Intent(
-                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            Uri.parse("package:${context.packageName}"),
-                        ),
-                    )
-                },
-            )
-            OnboardingStep.MODE -> ModeSelectionStep(
-                selectedMode = selectedMode,
-                onModeSelected = { selectedMode = it },
-            )
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+    Scaffold(snackbarHost = { SnackbarHost(hostState = snackbarHostState) }) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            if (stepIndex > 0) {
-                Button(
-                    modifier = Modifier.weight(1f),
-                    onClick = { stepIndex -= 1 },
-                ) {
-                    Text(stringResource(R.string.back))
-                }
-            }
+            Text(
+                text = stringResource(R.string.onboarding_welcome),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.onboarding_step, stepIndex + 1, steps.size),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
 
-            Button(
-                modifier = Modifier.weight(1f),
-                onClick = {
-                    if (currentStep == OnboardingStep.MODE) {
-                        onComplete(selectedMode, canDraw)
-                    } else {
-                        stepIndex += 1
-                    }
-                },
-            ) {
-                Text(
-                    if (currentStep == OnboardingStep.MODE) {
-                        stringResource(R.string.start_overlay)
-                    } else {
-                        stringResource(R.string.continue_label)
+            when (currentStep) {
+                OnboardingStep.INTRO -> IntroStep()
+                OnboardingStep.PERMISSION -> PermissionStep(
+                    onOpenPermission = {
+                        permissionLauncher.launch(
+                            Intent(
+                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                Uri.parse("package:${context.packageName}"),
+                            ),
+                        )
                     },
                 )
+                OnboardingStep.MODE -> ModeSelectionStep(
+                    selectedMode = selectedMode,
+                    isPremium = isPremium,
+                    onLockedModeSelected = {
+                        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.premium_feature)) }
+                    },
+                    onModeSelected = { selectedMode = it },
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (stepIndex > 0) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = { stepIndex -= 1 },
+                    ) {
+                        Text(stringResource(R.string.back))
+                    }
+                }
+
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        if (currentStep == OnboardingStep.MODE) {
+                            val completedMode = selectedMode.takeIf { !it.isPremiumMode() || isPremium }
+                                ?: OverlayMode.CLASSIC_DOTS
+                            onComplete(completedMode, canDraw)
+                        } else {
+                            stepIndex += 1
+                        }
+                    },
+                ) {
+                    Text(
+                        if (currentStep == OnboardingStep.MODE) {
+                            stringResource(R.string.start_overlay)
+                        } else {
+                            stringResource(R.string.continue_label)
+                        },
+                    )
+                }
             }
         }
     }
@@ -311,6 +331,8 @@ private fun PermissionStep(onOpenPermission: () -> Unit) {
 @Composable
 private fun ModeSelectionStep(
     selectedMode: OverlayMode,
+    isPremium: Boolean,
+    onLockedModeSelected: () -> Unit,
     onModeSelected: (OverlayMode) -> Unit,
 ) {
     val modes = listOf(OverlayMode.CLASSIC_DOTS, OverlayMode.EDGE_DOTS, OverlayMode.HORIZON)
@@ -321,6 +343,7 @@ private fun ModeSelectionStep(
             style = MaterialTheme.typography.bodyLarge,
         )
         modes.forEach { mode ->
+            val isPremiumMode = mode.isPremiumMode()
             val label = when (mode) {
                 OverlayMode.CLASSIC_DOTS -> stringResource(R.string.mode_dots)
                 OverlayMode.EDGE_DOTS -> stringResource(R.string.mode_edge)
@@ -330,7 +353,13 @@ private fun ModeSelectionStep(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onModeSelected(mode) }
+                    .clickable {
+                        if (isPremiumMode && !isPremium) {
+                            onLockedModeSelected()
+                        } else {
+                            onModeSelected(mode)
+                        }
+                    }
                     .border(
                         width = if (selectedMode == mode) 2.dp else 1.dp,
                         color = if (selectedMode == mode) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -345,7 +374,16 @@ private fun ModeSelectionStep(
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RadioButton(selected = selectedMode == mode, onClick = { onModeSelected(mode) })
+                    RadioButton(
+                        selected = selectedMode == mode,
+                        onClick = {
+                            if (isPremiumMode && !isPremium) {
+                                onLockedModeSelected()
+                            } else {
+                                onModeSelected(mode)
+                            }
+                        },
+                    )
                     Text(text = label, style = MaterialTheme.typography.titleMedium)
                 }
             }
@@ -365,8 +403,11 @@ private fun MainScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     val settings by settingsDataStore.settingsFlow.collectAsState(initial = OverlaySettings())
+    val isPremium = BuildConfig.FORCE_PREMIUM || settings.isPremium
+    val activeMode = settings.selectedMode.takeIf { !it.isPremiumMode() || isPremium } ?: OverlayMode.CLASSIC_DOTS
     var canDraw by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
     var isOverlayRunning by remember { mutableStateOf(isOverlayServiceRunning(context)) }
+    var logoTapCount by rememberSaveable { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         canDraw = Settings.canDrawOverlays(context)
@@ -399,11 +440,37 @@ private fun MainScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
-                text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Image(
+                    painter = painterResource(id = R.mipmap.ic_launcher),
+                    contentDescription = stringResource(R.string.app_logo),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clickable {
+                            logoTapCount += 1
+                            if (logoTapCount >= 5) {
+                                logoTapCount = 0
+                                val nextPremium = !settings.isPremium
+                                scope.launch {
+                                    settingsDataStore.setIsPremium(nextPremium)
+                                    snackbarHostState.showSnackbar(
+                                        context.getString(
+                                            if (nextPremium) R.string.premium_enabled else R.string.premium_disabled,
+                                        ),
+                                    )
+                                }
+                            }
+                        },
+                )
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             Text(
                 text = stringResource(R.string.main_tagline),
                 style = MaterialTheme.typography.bodyMedium,
@@ -469,7 +536,7 @@ private fun MainScreen(
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 modeOptions.forEachIndexed { index, mode ->
                     val isPro = mode == OverlayMode.EDGE_DOTS || mode == OverlayMode.HORIZON
-                    val enabled = !isPro || settings.isPremium
+                    val enabled = !isPro || isPremium
                     val label = when (mode) {
                         OverlayMode.CLASSIC_DOTS -> stringResource(R.string.mode_classic)
                         OverlayMode.EDGE_DOTS -> stringResource(R.string.mode_edge)
@@ -477,16 +544,16 @@ private fun MainScreen(
                         OverlayMode.DISABLED -> stringResource(R.string.mode_disabled)
                     }
                     SegmentedButton(
-                        selected = settings.selectedMode == mode,
+                        selected = activeMode == mode,
                         enabled = true,
                         onClick = {
                             if (enabled) {
-                                if (settings.selectedMode != mode) {
+                                if (activeMode != mode) {
                                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     scope.launch { settingsDataStore.setSelectedMode(mode) }
                                 }
                             } else {
-                                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.upgrade_to_unlock)) }
+                                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.premium_feature)) }
                             }
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = modeOptions.size),
@@ -496,7 +563,7 @@ private fun MainScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Text(label)
-                                if (isPro && !settings.isPremium) {
+                                if (isPro && !isPremium) {
                                     Badge { Text(stringResource(R.string.pro_badge)) }
                                 }
                             }
@@ -539,7 +606,7 @@ private fun MainScreen(
                 onSelected = { preset -> scope.launch { settingsDataStore.setDotColor(preset) } },
             )
 
-            if (settings.selectedMode != OverlayMode.HORIZON) {
+            if (activeMode != OverlayMode.HORIZON) {
                 PresetGroup(
                     title = stringResource(R.string.density),
                     options = DensityPreset.entries,
@@ -626,6 +693,8 @@ private fun PreviewScreen(
     onBack: () -> Unit,
 ) {
     val settings by settingsDataStore.settingsFlow.collectAsState(initial = OverlaySettings())
+    val isPremium = BuildConfig.FORCE_PREMIUM || settings.isPremium
+    val activeMode = settings.selectedMode.takeIf { !it.isPremiumMode() || isPremium } ?: OverlayMode.CLASSIC_DOTS
     val motionOffset = rememberPreviewMotion(intensity = mapIntensityPreset(settings.intensityPreset))
 
     Column(
@@ -644,7 +713,7 @@ private fun PreviewScreen(
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                when (settings.selectedMode) {
+                when (activeMode) {
                     OverlayMode.CLASSIC_DOTS, OverlayMode.EDGE_DOTS -> DotPreviewCanvas(
                         dotCount = mapDensityPreset(settings.densityPreset),
                         opacity = mapOpacityPreset(settings.opacityPreset),
@@ -652,7 +721,7 @@ private fun PreviewScreen(
                         dotColor = settings.dotColor,
                         sizeScale = mapSizePreset(settings.sizePreset),
                         motionOffset = motionOffset,
-                        edgeOnly = settings.selectedMode == OverlayMode.EDGE_DOTS,
+                        edgeOnly = activeMode == OverlayMode.EDGE_DOTS,
                     )
 
                     OverlayMode.HORIZON -> HorizonPreviewCanvas(
