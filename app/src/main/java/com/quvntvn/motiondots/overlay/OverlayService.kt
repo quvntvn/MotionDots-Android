@@ -15,9 +15,13 @@ import android.os.SystemClock
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import com.quvntvn.motiondots.data.DensityPreset
+import com.quvntvn.motiondots.data.IntensityPreset
+import com.quvntvn.motiondots.data.OpacityPreset
 import com.quvntvn.motiondots.data.OverlayMode
 import com.quvntvn.motiondots.data.OverlaySettings
 import com.quvntvn.motiondots.data.SettingsDataStore
+import com.quvntvn.motiondots.data.SizePreset
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -86,6 +90,9 @@ class OverlayService : Service(), SensorEventListener {
             swapOverlayForMode(settings.selectedMode)
         }
 
+        val mappedIntensity = mapIntensityPreset(settings.intensityPreset)
+        val mappedOpacity = mapOpacityPreset(settings.opacityPreset)
+
         when (val view = overlayView) {
             is DotsOverlayView -> {
                 val targetMode = if (settings.selectedMode == OverlayMode.EDGE_DOTS) {
@@ -94,16 +101,17 @@ class OverlayService : Service(), SensorEventListener {
                     DotsOverlayView.DotMode.CLASSIC
                 }
                 view.setMode(targetMode)
-                view.setOpacity(settings.opacity)
-                if (previous.dotCount != settings.dotCount || modeChanged) {
-                    view.setDotCount(settings.dotCount)
-                }
-                view.setIntensity(settings.intensity)
+                view.setOpacity(mappedOpacity)
+                view.setDotColor(settings.dotColor)
+                view.setDotCount(mapDensityPreset(settings.densityPreset))
+                view.setDotSizeScale(mapSizePreset(settings.sizePreset))
+                view.setIntensity(mappedIntensity)
             }
 
             is HorizonOverlayView -> {
-                view.setOpacity(settings.opacity)
-                view.setIntensity(settings.intensity)
+                view.setOpacity(mappedOpacity)
+                view.setIntensity(mappedIntensity)
+                view.setDotColor(settings.dotColor)
             }
         }
 
@@ -228,4 +236,28 @@ class OverlayService : Service(), SensorEventListener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun mapIntensityPreset(preset: IntensityPreset): Float = when (preset) {
+        IntensityPreset.LOW -> 3f
+        IntensityPreset.NORMAL -> 6f
+        IntensityPreset.HIGH -> 9f
+    }
+
+    private fun mapOpacityPreset(preset: OpacityPreset): Float = when (preset) {
+        OpacityPreset.SUBTLE -> 0.14f
+        OpacityPreset.BALANCED -> 0.24f
+        OpacityPreset.VISIBLE -> 0.38f
+    }
+
+    private fun mapDensityPreset(preset: DensityPreset): Int = when (preset) {
+        DensityPreset.LIGHT -> 24
+        DensityPreset.STANDARD -> 48
+        DensityPreset.DENSE -> 80
+    }
+
+    private fun mapSizePreset(preset: SizePreset): Float = when (preset) {
+        SizePreset.SMALL -> 0.75f
+        SizePreset.MEDIUM -> 1f
+        SizePreset.LARGE -> 1.35f
+    }
 }

@@ -76,11 +76,15 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.quvntvn.motiondots.data.DensityPreset
+import com.quvntvn.motiondots.data.DotColor
+import com.quvntvn.motiondots.data.IntensityPreset
+import com.quvntvn.motiondots.data.OpacityPreset
 import com.quvntvn.motiondots.data.OverlayMode
 import com.quvntvn.motiondots.data.OverlaySettings
 import com.quvntvn.motiondots.data.SettingsDataStore
+import com.quvntvn.motiondots.data.SizePreset
 import com.quvntvn.motiondots.overlay.OverlayService
-import com.quvntvn.motiondots.ui.components.SettingSlider
 import com.quvntvn.motiondots.ui.theme.MotionDotsTheme
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -501,32 +505,71 @@ private fun MainScreen(
                 }
             }
 
-            SettingSlider(
+            PresetGroup(
                 title = stringResource(R.string.intensity),
-                valueLabel = settings.intensity.toInt().toString(),
-                value = settings.intensity,
-                onValueChangeFinished = { value -> scope.launch { settingsDataStore.setIntensity(value) } },
-                valueRange = 0f..10f,
-                steps = 9,
+                options = IntensityPreset.entries,
+                selected = settings.intensityPreset,
+                label = { preset -> Text(preset.name.lowercase().replaceFirstChar(Char::uppercase)) },
+                onSelected = { preset -> scope.launch { settingsDataStore.setIntensityPreset(preset) } },
             )
 
-            SettingSlider(
+            PresetGroup(
                 title = stringResource(R.string.opacity),
-                valueLabel = stringResource(R.string.percent_value, (settings.opacity * 100).toInt()),
-                value = settings.opacity,
-                onValueChangeFinished = { value -> scope.launch { settingsDataStore.setOpacity(value) } },
-                valueRange = 0f..1f,
-                steps = 19,
+                options = OpacityPreset.entries,
+                selected = settings.opacityPreset,
+                label = { preset ->
+                    Text(
+                        when (preset) {
+                            OpacityPreset.SUBTLE -> stringResource(R.string.opacity_subtle)
+                            OpacityPreset.BALANCED -> stringResource(R.string.opacity_balanced)
+                            OpacityPreset.VISIBLE -> stringResource(R.string.opacity_visible)
+                        },
+                    )
+                },
+                onSelected = { preset -> scope.launch { settingsDataStore.setOpacityPreset(preset) } },
+            )
+
+            PresetGroup(
+                title = stringResource(R.string.dot_color),
+                options = DotColor.entries,
+                selected = settings.dotColor,
+                label = { preset ->
+                    Text(if (preset == DotColor.WHITE) stringResource(R.string.color_white) else stringResource(R.string.color_black))
+                },
+                onSelected = { preset -> scope.launch { settingsDataStore.setDotColor(preset) } },
             )
 
             if (settings.selectedMode != OverlayMode.HORIZON) {
-                SettingSlider(
+                PresetGroup(
                     title = stringResource(R.string.density),
-                    valueLabel = settings.dotCount.toString(),
-                    value = settings.dotCount.toFloat(),
-                    onValueChangeFinished = { value -> scope.launch { settingsDataStore.setDotCount(value.toInt()) } },
-                    valueRange = 10f..100f,
-                    steps = 89,
+                    options = DensityPreset.entries,
+                    selected = settings.densityPreset,
+                    label = { preset ->
+                        Text(
+                            when (preset) {
+                                DensityPreset.LIGHT -> stringResource(R.string.density_light)
+                                DensityPreset.STANDARD -> stringResource(R.string.density_standard)
+                                DensityPreset.DENSE -> stringResource(R.string.density_dense)
+                            },
+                        )
+                    },
+                    onSelected = { preset -> scope.launch { settingsDataStore.setDensityPreset(preset) } },
+                )
+
+                PresetGroup(
+                    title = stringResource(R.string.dot_size),
+                    options = SizePreset.entries,
+                    selected = settings.sizePreset,
+                    label = { preset ->
+                        Text(
+                            when (preset) {
+                                SizePreset.SMALL -> stringResource(R.string.size_small)
+                                SizePreset.MEDIUM -> stringResource(R.string.size_medium)
+                                SizePreset.LARGE -> stringResource(R.string.size_large)
+                            },
+                        )
+                    },
+                    onSelected = { preset -> scope.launch { settingsDataStore.setSizePreset(preset) } },
                 )
             }
 
@@ -553,13 +596,37 @@ private fun MainScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> PresetGroup(
+    title: String,
+    options: List<T>,
+    selected: T,
+    label: @Composable (T) -> Unit,
+    onSelected: (T) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(text = title, style = MaterialTheme.typography.titleMedium)
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, option ->
+                SegmentedButton(
+                    selected = selected == option,
+                    onClick = { onSelected(option) },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                    label = { label(option) },
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun PreviewScreen(
     settingsDataStore: SettingsDataStore,
     onBack: () -> Unit,
 ) {
     val settings by settingsDataStore.settingsFlow.collectAsState(initial = OverlaySettings())
-    val motionOffset = rememberPreviewMotion(intensity = settings.intensity)
+    val motionOffset = rememberPreviewMotion(intensity = mapIntensityPreset(settings.intensityPreset))
 
     Column(
         modifier = Modifier
@@ -579,16 +646,19 @@ private fun PreviewScreen(
             Box(modifier = Modifier.fillMaxSize()) {
                 when (settings.selectedMode) {
                     OverlayMode.CLASSIC_DOTS, OverlayMode.EDGE_DOTS -> DotPreviewCanvas(
-                        dotCount = settings.dotCount,
-                        opacity = settings.opacity,
-                        intensity = settings.intensity,
+                        dotCount = mapDensityPreset(settings.densityPreset),
+                        opacity = mapOpacityPreset(settings.opacityPreset),
+                        intensity = mapIntensityPreset(settings.intensityPreset),
+                        dotColor = settings.dotColor,
+                        sizeScale = mapSizePreset(settings.sizePreset),
                         motionOffset = motionOffset,
                         edgeOnly = settings.selectedMode == OverlayMode.EDGE_DOTS,
                     )
 
                     OverlayMode.HORIZON -> HorizonPreviewCanvas(
-                        opacity = settings.opacity,
-                        intensity = settings.intensity,
+                        opacity = mapOpacityPreset(settings.opacityPreset),
+                        intensity = mapIntensityPreset(settings.intensityPreset),
+                        dotColor = settings.dotColor,
                         motionOffset = motionOffset,
                     )
                     OverlayMode.DISABLED -> Unit
@@ -607,10 +677,13 @@ private fun DotPreviewCanvas(
     dotCount: Int,
     opacity: Float,
     intensity: Float,
+    dotColor: DotColor,
+    sizeScale: Float,
     motionOffset: Offset,
     edgeOnly: Boolean,
 ) {
-    val dotColor = MaterialTheme.colorScheme.primary.copy(alpha = opacity.coerceIn(0.1f, 1f))
+    val dotColorValue = if (dotColor == DotColor.BLACK) Color.Black else Color.White
+    val previewColor = dotColorValue.copy(alpha = opacity.coerceIn(0.1f, 1f))
     val points = remember(dotCount, edgeOnly) {
         val random = Random(dotCount * if (edgeOnly) 13 else 7)
         List(dotCount.coerceIn(10, 100)) {
@@ -639,8 +712,8 @@ private fun DotPreviewCanvas(
         val baseRadius = size.minDimension * 0.012f
         points.forEach { (xNorm, yNorm, radiusFactor) ->
             drawCircle(
-                color = dotColor,
-                radius = baseRadius * radiusFactor,
+                color = previewColor,
+                radius = (baseRadius * radiusFactor * sizeScale).coerceAtLeast(1f),
                 center = Offset(
                     x = (xNorm * size.width) + translatedOffset.x,
                     y = (yNorm * size.height) + translatedOffset.y,
@@ -654,9 +727,11 @@ private fun DotPreviewCanvas(
 private fun HorizonPreviewCanvas(
     opacity: Float,
     intensity: Float,
+    dotColor: DotColor,
     motionOffset: Offset,
 ) {
-    val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = opacity.coerceIn(0.1f, 1f))
+    val base = if (dotColor == DotColor.BLACK) Color.Black else Color.White
+    val lineColor = base.copy(alpha = opacity.coerceIn(0.1f, 1f))
     val intensityScale = (intensity / 10f).coerceIn(0f, 1f)
 
     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -741,6 +816,30 @@ private fun rememberPreviewMotion(intensity: Float): Offset {
             y = sin(demoPhase * 0.6f) * 0.24f * intensityScale,
         )
     }
+}
+
+private fun mapIntensityPreset(preset: IntensityPreset): Float = when (preset) {
+    IntensityPreset.LOW -> 3f
+    IntensityPreset.NORMAL -> 6f
+    IntensityPreset.HIGH -> 9f
+}
+
+private fun mapOpacityPreset(preset: OpacityPreset): Float = when (preset) {
+    OpacityPreset.SUBTLE -> 0.14f
+    OpacityPreset.BALANCED -> 0.24f
+    OpacityPreset.VISIBLE -> 0.38f
+}
+
+private fun mapDensityPreset(preset: DensityPreset): Int = when (preset) {
+    DensityPreset.LIGHT -> 24
+    DensityPreset.STANDARD -> 48
+    DensityPreset.DENSE -> 80
+}
+
+private fun mapSizePreset(preset: SizePreset): Float = when (preset) {
+    SizePreset.SMALL -> 0.75f
+    SizePreset.MEDIUM -> 1f
+    SizePreset.LARGE -> 1.35f
 }
 
 private fun isOverlayServiceRunning(context: android.content.Context): Boolean {

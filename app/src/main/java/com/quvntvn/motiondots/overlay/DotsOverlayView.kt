@@ -2,9 +2,11 @@ package com.quvntvn.motiondots.overlay
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.view.View
 import androidx.core.graphics.withSave
+import com.quvntvn.motiondots.data.DotColor
 import kotlin.math.abs
 import kotlin.random.Random
 
@@ -14,24 +16,28 @@ class DotsOverlayView(context: Context) : View(context) {
 
     private data class Dot(val x: Float, val y: Float, val radius: Float)
 
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+    }
     private val random = Random(System.currentTimeMillis())
     private var dots: List<Dot> = emptyList()
-    private var initialized = false
 
     private var dotCount: Int = 40
     private var opacity: Float = 0.16f
     private var intensity: Float = 5f
     private var mode: DotMode = DotMode.CLASSIC
+    private var dotRadiusScale: Float = 1f
 
     private var offsetX: Float = 0f
     private var offsetY: Float = 0f
 
-    fun configure(dotCount: Int, opacity: Float, mode: DotMode, intensity: Float) {
+    fun configure(dotCount: Int, opacity: Float, mode: DotMode, intensity: Float, dotRadiusScale: Float, dotColor: DotColor) {
         this.mode = mode
         setDotCount(dotCount)
         setOpacity(opacity)
         setIntensity(intensity)
+        setDotSizeScale(dotRadiusScale)
+        setDotColor(dotColor)
     }
 
     fun setOpacity(opacity: Float) {
@@ -43,10 +49,9 @@ class DotsOverlayView(context: Context) : View(context) {
 
     fun setDotCount(count: Int) {
         val newCount = count.coerceIn(10, 100)
-        if (dotCount == newCount && initialized) return
+        if (dotCount == newCount && dots.isNotEmpty()) return
         dotCount = newCount
-        initialized = false
-        invalidate()
+        regenerateDots()
     }
 
     fun setIntensity(intensity: Float) {
@@ -56,7 +61,20 @@ class DotsOverlayView(context: Context) : View(context) {
     fun setMode(mode: DotMode) {
         if (this.mode == mode) return
         this.mode = mode
-        initialized = false
+        regenerateDots()
+    }
+
+    fun setDotSizeScale(scale: Float) {
+        val sanitized = scale.coerceIn(0.5f, 2f)
+        if (dotRadiusScale == sanitized) return
+        dotRadiusScale = sanitized
+        regenerateDots()
+    }
+
+    fun setDotColor(color: DotColor) {
+        val target = if (color == DotColor.BLACK) Color.BLACK else Color.WHITE
+        if (paint.color == target) return
+        paint.color = target
         invalidate()
     }
 
@@ -75,13 +93,13 @@ class DotsOverlayView(context: Context) : View(context) {
         invalidate()
     }
 
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        regenerateDots()
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (!initialized && width > 0 && height > 0) {
-            dots = buildDots()
-            initialized = true
-        }
-
         paint.alpha = (opacity * 255).toInt().coerceIn(0, 255)
 
         canvas.withSave {
@@ -92,7 +110,17 @@ class DotsOverlayView(context: Context) : View(context) {
         }
     }
 
-    private fun buildDots(): List<Dot> {
+    private fun regenerateDots() {
+        if (width <= 0 || height <= 0) {
+            dots = emptyList()
+            invalidate()
+            return
+        }
+        dots = buildDots(width = width.toFloat(), height = height.toFloat())
+        invalidate()
+    }
+
+    private fun buildDots(width: Float, height: Float): List<Dot> {
         val list = ArrayList<Dot>(dotCount)
         val sideBand = width * 0.2f
 
@@ -108,7 +136,7 @@ class DotsOverlayView(context: Context) : View(context) {
                 }
             }
             val y = random.nextFloat() * height
-            val radius = 5f + random.nextFloat() * 8f
+            val radius = (5f + random.nextFloat() * 8f) * dotRadiusScale
             list += Dot(x, y, radius)
         }
         return list
