@@ -39,6 +39,7 @@ class SettingsDataStore(private val context: Context) {
         val SelectedMode: Preferences.Key<String> = stringPreferencesKey("selected_mode")
         val AutoStartOverlay: Preferences.Key<Boolean> = booleanPreferencesKey("auto_start_overlay")
         val IsPremium: Preferences.Key<Boolean> = booleanPreferencesKey("is_premium")
+        val HasOnboarded: Preferences.Key<Boolean> = booleanPreferencesKey("has_onboarded")
     }
 
     val settingsFlow: Flow<OverlaySettings> = context.dataStore.data.map { prefs ->
@@ -52,6 +53,10 @@ class SettingsDataStore(private val context: Context) {
             autoStartOverlay = prefs[Keys.AutoStartOverlay] ?: false,
             isPremium = prefs[Keys.IsPremium] ?: false,
         )
+    }
+
+    val hasOnboardedFlow: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[Keys.HasOnboarded] ?: false
     }
 
     suspend fun setIntensity(value: Float) {
@@ -76,5 +81,9 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setIsPremium(value: Boolean) {
         context.dataStore.edit { it[Keys.IsPremium] = value }
+    }
+
+    suspend fun setHasOnboarded(value: Boolean) {
+        context.dataStore.edit { it[Keys.HasOnboarded] = value }
     }
 }
