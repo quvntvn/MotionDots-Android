@@ -1,0 +1,52 @@
+<resources>
+    <string name="app_name">MotionDots</string>
+    <string name="loading">Chargement…</string>
+
+    <string name="onboarding_welcome">Bienvenue sur MotionDots</string>
+    <string name="onboarding_step">Étape %1$d sur %2$d</string>
+    <string name="back">Retour</string>
+    <string name="continue_label">Continuer</string>
+    <string name="start_overlay">Démarrer la superposition</string>
+    <string name="intro_description">MotionDots ajoute des repères visuels subtils pour aider votre corps à anticiper les mouvements et réduire l’inconfort lié au déplacement.</string>
+    <string name="illustration_placeholder">Illustration</string>
+    <string name="permission_description">L’autorisation de superposition permet à MotionDots d’afficher des indicateurs au-dessus de vos applications pendant vos trajets.</string>
+    <string name="allow_overlay_permission">Autoriser la superposition</string>
+    <string name="select_cue_style">Choisissez votre style de repère préféré</string>
+
+    <string name="mode_dots">Points</string>
+    <string name="mode_edge">Bords</string>
+    <string name="mode_horizon">Horizon</string>
+    <string name="mode_disabled">Désactivé</string>
+    <string name="mode_classic">Classique</string>
+    <string name="mode_label">Mode</string>
+
+    <string name="main_tagline">Repères de stabilisation prêts au démarrage pour plus de confort en mouvement.</string>
+    <string name="status_title">Statut</string>
+    <string name="overlay_permission_status">Autorisation de superposition : %1$s</string>
+    <string name="overlay_running_status">Superposition active : %1$s</string>
+    <string name="status_granted">Accordée</string>
+    <string name="status_required">Requise</string>
+    <string name="status_running">En cours</string>
+    <string name="status_stopped">Arrêtée</string>
+    <string name="grant_overlay_permission">Accorder l’autorisation</string>
+    <string name="stop_service">Arrêter le service</string>
+    <string name="start_service">Démarrer le service</string>
+    <string name="overlay_stopped">Superposition arrêtée</string>
+    <string name="overlay_started">Superposition démarrée</string>
+    <string name="preview">Aperçu</string>
+    <string name="upgrade_to_unlock">Passez à la version supérieure pour débloquer</string>
+    <string name="pro_badge">PRO</string>
+
+    <string name="intensity">Intensité</string>
+    <string name="opacity">Opacité</string>
+    <string name="density">Densité</string>
+    <string name="auto_start_overlay">Démarrage automatique de la superposition</string>
+    <string name="privacy_note">Hors ligne. Aucune collecte de données.</string>
+    <string name="changes_apply_instantly">Les changements s’appliquent instantanément.</string>
+    <string name="slider_value_format">%1$s : %2$s</string>
+    <string name="percent_value">%1$d%%</string>
+
+    <string name="preview_title">Aperçu</string>
+    <string name="preview_subtitle">Aperçu en direct dans l’app (pas d’autorisation de superposition requise).</string>
+    <string name="back_to_home">Retour à l’accueil</string>
+</resources>

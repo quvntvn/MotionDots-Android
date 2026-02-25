@@ -21,30 +21,58 @@ class DotsOverlayView(context: Context) : View(context) {
 
     private var dotCount: Int = 40
     private var opacity: Float = 0.16f
+    private var intensity: Float = 5f
     private var mode: DotMode = DotMode.CLASSIC
 
     private var offsetX: Float = 0f
     private var offsetY: Float = 0f
-    private var shouldAnimate = false
 
-    fun configure(dotCount: Int, opacity: Float, mode: DotMode) {
-        this.dotCount = dotCount.coerceIn(10, 100)
-        this.opacity = opacity.coerceIn(0.1f, 0.2f)
+    fun configure(dotCount: Int, opacity: Float, mode: DotMode, intensity: Float) {
+        this.mode = mode
+        setDotCount(dotCount)
+        setOpacity(opacity)
+        setIntensity(intensity)
+    }
+
+    fun setOpacity(opacity: Float) {
+        val newOpacity = opacity.coerceIn(0f, 1f)
+        if (this.opacity == newOpacity) return
+        this.opacity = newOpacity
+        invalidate()
+    }
+
+    fun setDotCount(count: Int) {
+        val newCount = count.coerceIn(10, 100)
+        if (dotCount == newCount && initialized) return
+        dotCount = newCount
+        initialized = false
+        invalidate()
+    }
+
+    fun setIntensity(intensity: Float) {
+        this.intensity = intensity.coerceIn(0f, 10f)
+    }
+
+    fun setMode(mode: DotMode) {
+        if (this.mode == mode) return
         this.mode = mode
         initialized = false
         invalidate()
     }
 
     fun setMotion(dx: Float, dy: Float) {
-        val movementThreshold = 0.4f
-        if (abs(dx) < movementThreshold && abs(dy) < movementThreshold) {
-            shouldAnimate = false
+        val intensityScale = (intensity / 10f).coerceIn(0f, 1f)
+        val scaledX = (dx * intensityScale).coerceIn(-60f, 60f)
+        val scaledY = (dy * intensityScale).coerceIn(-60f, 60f)
+        val movementThreshold = 0.2f
+
+        if (abs(offsetX - scaledX) < movementThreshold && abs(offsetY - scaledY) < movementThreshold) {
             return
         }
-        shouldAnimate = true
-        offsetX = dx.coerceIn(-60f, 60f)
-        offsetY = dy.coerceIn(-60f, 60f)
-        postInvalidateOnAnimation()
+
+        offsetX = scaledX
+        offsetY = scaledY
+        invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -61,10 +89,6 @@ class DotsOverlayView(context: Context) : View(context) {
             for (dot in dots) {
                 drawCircle(dot.x, dot.y, dot.radius, paint)
             }
-        }
-
-        if (shouldAnimate) {
-            postInvalidateOnAnimation()
         }
     }
 
