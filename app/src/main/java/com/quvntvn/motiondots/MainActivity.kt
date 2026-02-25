@@ -2,6 +2,10 @@ package com.quvntvn.motiondots
 
 import android.app.ActivityManager
 import android.content.Intent
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -40,22 +44,27 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +79,9 @@ import com.quvntvn.motiondots.data.SettingsDataStore
 import com.quvntvn.motiondots.overlay.OverlayService
 import com.quvntvn.motiondots.ui.components.SettingSlider
 import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.random.Random
 
 class MainActivity : ComponentActivity() {
 
@@ -515,6 +527,7 @@ private fun PreviewScreen(
     onBack: () -> Unit,
 ) {
     val settings by settingsDataStore.settingsFlow.collectAsState(initial = OverlaySettings())
+    val motionOffset = rememberPreviewMotion(intensity = settings.intensity)
 
     Column(
         modifier = Modifier
@@ -536,17 +549,23 @@ private fun PreviewScreen(
                     OverlayMode.CLASSIC_DOTS, OverlayMode.EDGE_DOTS -> DotPreviewCanvas(
                         dotCount = settings.dotCount,
                         opacity = settings.opacity,
+                        intensity = settings.intensity,
+                        motionOffset = motionOffset,
                         edgeOnly = settings.selectedMode == OverlayMode.EDGE_DOTS,
                     )
 
-                    OverlayMode.HORIZON -> HorizonPreviewCanvas(opacity = settings.opacity)
+                    OverlayMode.HORIZON -> HorizonPreviewCanvas(
+                        opacity = settings.opacity,
+                        intensity = settings.intensity,
+                        motionOffset = motionOffset,
+                    )
                     OverlayMode.DISABLED -> Unit
                 }
             }
         }
 
-        Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-            Text("Back")
+        TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
+            Text("Back to Home")
         }
     }
 }
@@ -555,43 +574,139 @@ private fun PreviewScreen(
 private fun DotPreviewCanvas(
     dotCount: Int,
     opacity: Float,
+    intensity: Float,
+    motionOffset: Offset,
     edgeOnly: Boolean,
 ) {
     val dotColor = MaterialTheme.colorScheme.primary.copy(alpha = opacity.coerceIn(0.1f, 1f))
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val columns = 10
-        val rows = (dotCount / columns).coerceAtLeast(1)
-        val horizontalGap = size.width / (columns + 1)
-        val verticalGap = size.height / (rows + 1)
-
-        var drawn = 0
-        for (row in 1..rows) {
-            for (col in 1..columns) {
-                if (drawn >= dotCount) break
-                val isEdge = col == 1 || col == columns
-                if (!edgeOnly || isEdge) {
-                    drawCircle(
-                        color = dotColor,
-                        radius = 6.dp.toPx(),
-                        center = androidx.compose.ui.geometry.Offset(col * horizontalGap, row * verticalGap),
-                    )
+    val points = remember(dotCount, edgeOnly) {
+        val random = Random(dotCount * if (edgeOnly) 13 else 7)
+        List(dotCount.coerceIn(10, 100)) {
+            val normalizedX = if (edgeOnly) {
+                if (random.nextBoolean()) {
+                    random.nextFloat() * 0.2f
+                } else {
+                    1f - random.nextFloat() * 0.2f
                 }
-                drawn += 1
+            } else {
+                random.nextFloat()
             }
+            val normalizedY = random.nextFloat()
+            val radiusFactor = 0.6f + (random.nextFloat() * 0.8f)
+            Triple(normalizedX, normalizedY, radiusFactor)
+        }
+    }
+
+    val intensityScale = (intensity / 10f).coerceIn(0f, 1f)
+    val translatedOffset = Offset(
+        x = motionOffset.x * (16f + (intensityScale * 54f)),
+        y = motionOffset.y * (16f + (intensityScale * 54f)),
+    )
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val baseRadius = size.minDimension * 0.012f
+        points.forEach { (xNorm, yNorm, radiusFactor) ->
+            drawCircle(
+                color = dotColor,
+                radius = baseRadius * radiusFactor,
+                center = Offset(
+                    x = (xNorm * size.width) + translatedOffset.x,
+                    y = (yNorm * size.height) + translatedOffset.y,
+                ),
+            )
         }
     }
 }
 
 @Composable
-private fun HorizonPreviewCanvas(opacity: Float) {
+private fun HorizonPreviewCanvas(
+    opacity: Float,
+    intensity: Float,
+    motionOffset: Offset,
+) {
     val lineColor = MaterialTheme.colorScheme.primary.copy(alpha = opacity.coerceIn(0.1f, 1f))
+    val intensityScale = (intensity / 10f).coerceIn(0f, 1f)
+
     Canvas(modifier = Modifier.fillMaxSize()) {
-        drawLine(
-            color = lineColor,
-            start = androidx.compose.ui.geometry.Offset(0f, size.height / 2f),
-            end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2f),
-            strokeWidth = 6.dp.toPx(),
-            cap = StrokeCap.Round,
+        val centerY = (size.height / 2f) + (motionOffset.y * (20f + (intensityScale * 110f)))
+        val tiltDegrees = motionOffset.x * (5f + (intensityScale * 17f))
+
+        rotate(degrees = tiltDegrees, pivot = Offset(size.width / 2f, centerY)) {
+            drawLine(
+                color = lineColor,
+                start = Offset(0f, centerY),
+                end = Offset(size.width, centerY),
+                strokeWidth = 6.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+@Composable
+private fun rememberPreviewMotion(intensity: Float): Offset {
+    val context = LocalContext.current
+    val intensityScale by rememberUpdatedState((intensity / 10f).coerceIn(0.12f, 1f))
+
+    var sensorOffsetX by remember { mutableFloatStateOf(0f) }
+    var sensorOffsetY by remember { mutableFloatStateOf(0f) }
+    var sensorAvailable by remember { mutableStateOf(false) }
+
+    DisposableEffect(context) {
+        val sensorManager = context.getSystemService(SensorManager::class.java)
+        val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
+            ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+
+        if (sensorManager == null || sensor == null) {
+            sensorAvailable = false
+            onDispose {}
+        } else {
+            sensorAvailable = true
+            var filteredX = 0f
+            var filteredY = 0f
+
+            val listener = object : SensorEventListener {
+                override fun onSensorChanged(event: SensorEvent?) {
+                    val values = event?.values ?: return
+                    if (values.size < 2) return
+
+                    val alpha = 0.18f
+                    filteredX += alpha * (values[0] - filteredX)
+                    filteredY += alpha * (values[1] - filteredY)
+
+                    sensorOffsetX = (-filteredX * 0.08f).coerceIn(-1f, 1f)
+                    sensorOffsetY = (filteredY * 0.08f).coerceIn(-1f, 1f)
+                }
+
+                override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+            }
+
+            sensorManager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_UI)
+            onDispose { sensorManager.unregisterListener(listener) }
+        }
+    }
+
+    var demoPhase by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(sensorAvailable) {
+        if (sensorAvailable) return@LaunchedEffect
+        while (true) {
+            kotlinx.coroutines.delay(16L)
+            demoPhase += 0.03f
+            if (demoPhase > (2f * PI.toFloat())) {
+                demoPhase -= (2f * PI.toFloat())
+            }
+        }
+    }
+
+    return if (sensorAvailable) {
+        Offset(
+            x = sensorOffsetX * intensityScale,
+            y = sensorOffsetY * intensityScale,
+        )
+    } else {
+        Offset(
+            x = sin(demoPhase) * 0.3f * intensityScale,
+            y = sin(demoPhase * 0.6f) * 0.24f * intensityScale,
         )
     }
 }
