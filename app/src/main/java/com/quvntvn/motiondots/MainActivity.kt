@@ -66,7 +66,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -78,6 +80,7 @@ import com.quvntvn.motiondots.data.OverlaySettings
 import com.quvntvn.motiondots.data.SettingsDataStore
 import com.quvntvn.motiondots.overlay.OverlayService
 import com.quvntvn.motiondots.ui.components.SettingSlider
+import com.quvntvn.motiondots.ui.theme.MotionDotsTheme
 import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.sin
@@ -88,7 +91,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            MotionDotsTheme {
                 MotionDotsApp()
             }
         }
@@ -346,6 +349,7 @@ private fun MainScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
     val snackbarHostState = remember { SnackbarHostState() }
 
     val settings by settingsDataStore.settingsFlow.collectAsState(initial = OverlaySettings())
@@ -372,6 +376,7 @@ private fun MainScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Column(
@@ -427,9 +432,13 @@ private fun MainScreen(
                     if (isOverlayRunning) {
                         context.stopService(Intent(context, OverlayService::class.java))
                         isOverlayRunning = false
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        scope.launch { snackbarHostState.showSnackbar("Overlay stopped") }
                     } else if (canDraw) {
                         context.startService(Intent(context, OverlayService::class.java))
                         isOverlayRunning = true
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        scope.launch { snackbarHostState.showSnackbar("Overlay started") }
                     }
                 },
             ) {
@@ -460,7 +469,10 @@ private fun MainScreen(
                         enabled = true,
                         onClick = {
                             if (enabled) {
-                                scope.launch { settingsDataStore.setSelectedMode(mode) }
+                                if (settings.selectedMode != mode) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    scope.launch { settingsDataStore.setSelectedMode(mode) }
+                                }
                             } else {
                                 scope.launch { snackbarHostState.showSnackbar("Upgrade to unlock") }
                             }
@@ -517,6 +529,12 @@ private fun MainScreen(
                     onCheckedChange = { checked -> scope.launch { settingsDataStore.setAutoStartOverlay(checked) } },
                 )
             }
+
+            Text(
+                text = "Offline. No data collection.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
